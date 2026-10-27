@@ -1,0 +1,7 @@
+// Copy to Config/Local.xcconfig and fill in. It's git-ignored.
+
+// Your Apple Developer team ID (developer.apple.com > Account > Membership details).
+DEVELOPMENT_TEAM = ABCDE12345
+
+// Must be unique to you; the iCloud container becomes iCloud.<prefix>.chatbot
+BUNDLE_ID_PREFIX = com.yourname

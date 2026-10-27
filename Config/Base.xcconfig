@@ -1,0 +1,7 @@
+// Shared build settings. Don't put personal values here: copy
+// Local.xcconfig.example to Local.xcconfig (git-ignored) and fill it in.
+
+BUNDLE_ID_PREFIX = com.example
+DEVELOPMENT_TEAM =
+
+#include? "Local.xcconfig"
