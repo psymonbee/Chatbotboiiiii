@@ -27,12 +27,13 @@ struct SettingsView: View {
             .navigationTitle("Settings")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
+                // Also needed on Mac, where Settings opens as a sheet from the API key banner.
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
             }
-            #endif
             .task { await refresh() }
             .sheet(item: $editor) { PersonaEditor(target: $0) }
         }

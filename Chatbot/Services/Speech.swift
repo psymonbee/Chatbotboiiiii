@@ -93,9 +93,7 @@ final class SpeechInput {
     @ObservationIgnored private var task: SFSpeechRecognitionTask?
 
     func requestAccess() async -> Bool {
-        let speech = await withCheckedContinuation { continuation in
-            SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0) }
-        }
+        let speech = await Self.speechAuthorization()
         guard speech == .authorized else {
             status = .unavailable("Speech recognition is turned off for this app. You can allow it in Settings.")
             return false
@@ -121,18 +119,26 @@ final class SpeechInput {
         }
         AudioSessionConfig.forRecording()
 
+        // A Mac with no microphone (or a busy audio session) reports a 0 Hz format,
+        // and installing a tap with it raises an exception.
+        let input = engine.inputNode
+        let format = input.outputFormat(forBus: 0)
+        guard format.sampleRate > 0, format.channelCount > 0 else {
+            status = .unavailable("No microphone is available.")
+            return
+        }
+
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
         request.addsPunctuation = true
         if recognizer.supportsOnDeviceRecognition { request.requiresOnDeviceRecognition = true }
         self.request = request
 
-        let input = engine.inputNode
         input.removeTap(onBus: 0)
         input.installTap(
             onBus: 0,
             bufferSize: 1024,
-            format: input.outputFormat(forBus: 0),
+            format: format,
             block: Self.tapBlock(request: request) { @Sendable [weak self] rms in
                 Task { @MainActor in self?.updateLevel(rms) }
             }
@@ -141,6 +147,8 @@ final class SpeechInput {
         do {
             try engine.start()
         } catch {
+            input.removeTap(onBus: 0)
+            self.request = nil
             status = .unavailable("Couldn't start the microphone: \(error.localizedDescription)")
             return
         }
@@ -178,7 +186,14 @@ final class SpeechInput {
         if isFinal { stop() }
     }
 
-    // Built outside the main actor: the audio engine and recognizer call these on their own threads.
+    // Built outside the main actor: the audio engine, recognizer and permission prompt
+    // call these back on their own threads.
+    nonisolated private static func speechAuthorization() async -> SFSpeechRecognizerAuthorizationStatus {
+        await withCheckedContinuation { continuation in
+            SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0) }
+        }
+    }
+
     nonisolated private static func tapBlock(
         request: SFSpeechAudioBufferRecognitionRequest,
         level: @escaping @Sendable (Float) -> Void
@@ -196,7 +211,7 @@ final class SpeechInput {
 
     nonisolated private static func resultHandler(
         _ forward: @escaping @Sendable (String?, Bool) -> Void
-    ) -> (SFSpeechRecognitionResult?, Error?) -> Void {
+    ) -> @Sendable (SFSpeechRecognitionResult?, Error?) -> Void {
         { result, error in
             forward(result?.bestTranscription.formattedString, (result?.isFinal ?? false) || error != nil)
         }

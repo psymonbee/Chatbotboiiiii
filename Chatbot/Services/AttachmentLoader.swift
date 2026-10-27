@@ -112,7 +112,7 @@ enum ImageProcessing {
         }
         let type: UTType = opaque ? .jpeg : .png
         let out = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(out, type.identifier as CFString, 1, nil) else { return nil }
+        guard let destination = CGImageDestinationCreateWithData(out as CFMutableData, type.identifier as CFString, 1, nil) else { return nil }
         let props: [CFString: Any] = [kCGImageDestinationLossyCompressionQuality: 0.85]
         CGImageDestinationAddImage(destination, image, props as CFDictionary)
         guard CGImageDestinationFinalize(destination) else { return nil }
